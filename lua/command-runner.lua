@@ -2,7 +2,10 @@ local Job = require("plenary.job")
 
 ---@diagnostic disable: deprecated
 ---@class Config
-local config = {}
+local config = {
+  ---@type boolean
+  run_next_on_failure = false,
+}
 
 ---@class MyModule
 local M = {
@@ -176,7 +179,8 @@ M.run_commands = function()
     end)
   end
 
-  local function handle_output(cmd, next_command)
+  local function handle_output(icmd)
+    local cmd = M.commands[icmd]
     write_to_buffer(buf, "> " .. cmd)
     vim.notify("Running command: " .. cmd, vim.log.levels.INFO)
 
@@ -198,25 +202,33 @@ M.run_commands = function()
         write_to_buffer(buf, data)
       end,
       on_exit = function(_, code)
-        write_to_buffer(buf, "Exit code: " .. code)
+        if code == 0 then
+          vim.notify("Command: `" .. cmd .. "` ran successfully", vim.log.levels.INFO)
+        else
+          vim.notify("Command: `" .. cmd .. "` failed with exit code: " .. code, vim.log.levels.ERROR)
+        end
         write_to_buffer(buf, "")
       end,
     })
 
     job:start()
 
-    if next_command ~= nil then
+    if icmd == #M.commands then
+      return
+    end
+
+    if M.config.run_next_on_failure then
       job:after(function()
-        handle_output(next_command)
+        handle_output(icmd + 1)
+      end)
+    else
+      job:after_success(function()
+        handle_output(icmd + 1)
       end)
     end
   end
 
-  -- increment by 2 to get the next two commands
-  for i = 1, #M.commands, 2 do
-    local next_command = M.commands[i + 1]
-    handle_output(M.commands[i], next_command)
-  end
+  handle_output(1)
 end
 
 return M

@@ -17,7 +17,10 @@ using [lazy.nvim](https://github.com/folke/lazy.nvim):
 {
   "marzeq/command-runner.nvim",
   depends = { "nvim-lua/plenary.nvim" },
-  opts = {}, -- no configuration yet, but this is for when there is one
+  -- these are the default options, you don't need to include them if you don't want to change them
+  opts = {
+    run_next_on_failure = false,
+  },
 },
 ```
 
