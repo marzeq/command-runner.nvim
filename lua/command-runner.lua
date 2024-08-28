@@ -1,3 +1,5 @@
+local Job = require("plenary.job")
+
 ---@diagnostic disable: deprecated
 ---@class Config
 local config = {}
@@ -82,34 +84,133 @@ M.run_commands = function()
   vim.api.nvim_set_current_buf(buf)
 
   local function write_to_buffer(b, word)
-    vim.api.nvim_buf_set_option(b, "modifiable", true)
-    -- check if the buffer contains absolutelely nothing, to avoid adding a newline at the beginning
-    if vim.api.nvim_buf_get_lines(b, 0, -1, false)[1] == "" then
-      vim.api.nvim_buf_set_lines(b, 0, -1, false, { word })
-    else
-      vim.api.nvim_buf_set_lines(b, -1, -1, false, { word })
-    end
-    vim.api.nvim_buf_set_option(b, "modifiable", false)
+    vim.schedule(function()
+      vim.api.nvim_buf_set_option(b, "modifiable", true)
+      -- check if the buffer contains absolutelely nothing, to avoid adding a newline at the beginning
+      if vim.api.nvim_buf_get_lines(b, 0, -1, false)[1] == "" then
+        vim.api.nvim_buf_set_lines(b, 0, -1, false, { word })
+      else
+        vim.api.nvim_buf_set_lines(b, -1, -1, false, { word })
+      end
+      vim.api.nvim_buf_set_option(b, "modifiable", false)
+    end)
   end
 
   local function handle_output(cmd)
     write_to_buffer(buf, "> " .. cmd)
-    local handle = io.popen(cmd .. " 2>&1")
-    if handle == nil then
-      write_to_buffer(buf, "Error running command: " .. cmd)
-      write_to_buffer(buf, "")
-      return
+
+    local parts = split(cmd)
+
+    local command = parts[1]
+    local args = {}
+    for i = 2, #parts do
+      args[i - 1] = parts[i]
     end
-    for line in handle:lines() do
-      write_to_buffer(buf, line)
-    end
-    handle:close()
-    write_to_buffer(buf, "")
+
+    local job = Job:new({
+      command = command,
+      args = args,
+      on_stdout = function(_, data)
+        write_to_buffer(buf, data)
+      end,
+      on_stderr = function(_, data)
+        write_to_buffer(buf, data)
+      end,
+      on_exit = function(_, code)
+        write_to_buffer(buf, "Exit code: " .. code)
+        write_to_buffer(buf, "")
+      end,
+    })
+
+    job:start()
+
+    job:wait()
   end
 
   for _, cmd in ipairs(M.commands) do
     handle_output(cmd)
   end
+end
+
+local function split(s)
+  local SQ = 0x27
+  local DQ = 0x22
+  local SP = 0x20
+  local HT = 0x09
+  local LF = 0x0A
+  local CR = 0x0D
+  local BS = 0x5C
+
+  local token
+  local state
+  local escape = false
+  local result = {}
+  for i = 1, #s do
+    local c = s:byte(i)
+    local v = string.char(c)
+    if state == SQ then
+      if c == SQ then
+        state = nil
+      else
+        token[#token + 1] = v
+      end
+    elseif state == DQ then
+      if escape then
+        if c == DQ or c == BS then
+          token[#token + 1] = v
+        else
+          token[#token + 1] = "\\"
+          token[#token + 1] = v
+        end
+        escape = false
+      else
+        if c == DQ then
+          state = nil
+        elseif c == BS then
+          escape = true
+        else
+          token[#token + 1] = v
+        end
+      end
+    else
+      if escape then
+        token[#token + 1] = v
+        escape = false
+      else
+        if c == SP or c == HT or c == LF or c == CR then
+          if token ~= nil then
+            result[#result + 1] = table.concat(token)
+            token = nil
+          end
+        else
+          if token == nil then
+            token = {}
+          end
+          if c == SQ then
+            state = SQ
+          elseif c == DQ then
+            state = DQ
+          elseif c == BS then
+            escape = true
+          else
+            token[#token + 1] = v
+          end
+        end
+      end
+    end
+  end
+
+  if state ~= nil then
+    error("no closing quotation")
+  end
+  if escape then
+    error("no escaped character")
+  end
+
+  if token ~= nil then
+    result[#result + 1] = table.concat(token)
+  end
+  return result
 end
 
 return M

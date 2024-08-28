@@ -16,6 +16,7 @@ using [lazy.nvim](https://github.com/folke/lazy.nvim):
 ```lua
 {
   "marzeq/command-runner.nvim",
+  depends = { "nvim-lua/plenary.nvim" },
   opts = {}, -- no configuration yet, but this is for when there is one
 },
 ```
@@ -40,10 +41,12 @@ it's pretty straight forward, i think i already explained it well in the introdu
 ## credits
 
 - me
+- [plenary.nvim](https://github.com/nvim-lua/plenary.nvim) for plenary.job (which is a godsend btw)
+- [dromozoa](https://github.com/dromozoa/dromozoa-shlex) for the shlex.lua library
 
 ## license & usage
 
-licensed under MIT (see [LICENSE](LICENSE))
+licensed under GPL V3 (see [LICENSE](LICENSE))
 
 if you plan on using this plugin in a distribution, i would appreciate it if you let me know and credited me properly
 
