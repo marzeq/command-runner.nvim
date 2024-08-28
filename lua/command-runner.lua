@@ -150,8 +150,6 @@ M.run_commands = function()
     return
   end
 
-  vim.notify("Running commands", vim.log.levels.INFO)
-
   local height = math.ceil(vim.o.lines * 0.25)
   local original_splitbelow = vim.api.nvim_get_option("splitbelow")
   vim.api.nvim_set_option("splitbelow", true)
@@ -178,8 +176,9 @@ M.run_commands = function()
     end)
   end
 
-  local function handle_output(cmd)
+  local function handle_output(cmd, next_command)
     write_to_buffer(buf, "> " .. cmd)
+    vim.notify("Running command: " .. cmd, vim.log.levels.INFO)
 
     local parts = split(cmd)
 
@@ -206,11 +205,17 @@ M.run_commands = function()
 
     job:start()
 
-    job:wait()
+    if next_command ~= nil then
+      job:after(function()
+        handle_output(next_command)
+      end)
+    end
   end
 
-  for _, cmd in ipairs(M.commands) do
-    handle_output(cmd)
+  -- increment by 2 to get the next two commands
+  for i = 1, #M.commands, 2 do
+    local next_command = M.commands[i + 1]
+    handle_output(M.commands[i], next_command)
   end
 end
 
