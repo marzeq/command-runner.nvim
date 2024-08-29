@@ -53,17 +53,17 @@ local function get_dir_absolute()
   return vim.fn.fnamemodify(cwd, ":p")
 end
 
-local function set_commands(commands)
+M.set_commands_directly = function(commands)
   add_entry(get_dir_absolute(), commands)
 end
 
-local function get_commands()
+M.get_commands = function()
   local loaded = load_json(config_fp)
   return loaded[get_dir_absolute()] or {}
 end
 
 M.set_commands = function()
-  local cmds = get_commands()
+  local cmds = M.get_commands()
   local buf = vim.api.nvim_create_buf(false, true)
 
   local width = 50
@@ -121,7 +121,7 @@ M.set_commands = function()
           return line ~= ""
         end, commands)
 
-        set_commands(commands)
+        M.set_commands_directly(commands)
       end
     end,
   })
@@ -214,7 +214,7 @@ end
 
 ---@param index number|string|nil @The index of the command to run, nil for running all
 M.run_command = function(index)
-  local commands = get_commands()
+  local commands = M.get_commands()
 
   if #commands == 0 then
     vim.notify("No commands to run, opening setter window to set commands", vim.log.levels.ERROR)
