@@ -43,18 +43,23 @@ local function add_entry(path, commands)
   vim.fn.writefile({ vim.fn.json_encode(loaded) }, config_fp)
 end
 
-local function get_cwd_absolute()
+local function get_dir_absolute()
+  local git_dir = vim.fn.systemlist("git rev-parse --show-toplevel 2> /dev/null")[1]
+  if git_dir ~= nil and git_dir ~= "" then
+    return git_dir
+  end
+
   local cwd = vim.fn.getcwd()
   return vim.fn.fnamemodify(cwd, ":p")
 end
 
 local function set_commands(commands)
-  add_entry(get_cwd_absolute(), commands)
+  add_entry(get_dir_absolute(), commands)
 end
 
 local function get_commands()
   local loaded = load_json(config_fp)
-  return loaded[get_cwd_absolute()] or {}
+  return loaded[get_dir_absolute()] or {}
 end
 
 M.set_commands = function()

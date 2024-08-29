@@ -41,7 +41,8 @@ when you're done, press `<esc>` or `q` to close the popup window.
 
 if you ever want to change the commands, you can run it again, and the commands will appear there again for you to edit.
 
-each directory has it's own set of commands, so you can have different sets of commands for different projects. they are persistent across sessions.
+each project has it's own set of commands that are persistent accross sessions. if you are inside a git repo, the root of the repo will be stored, so no matter how deep you are in the project tree, the commands will be the same.
+otherwise, the current working directory will be used as a fallback.
 
 ### running the commands
 
