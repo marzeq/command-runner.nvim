@@ -142,7 +142,8 @@ M.run_command = function(index)
   local commands = get_commands()
 
   if #commands == 0 then
-    vim.notify("No commands to run", vim.log.levels.ERROR)
+    vim.notify("No commands to run, opening setter window to set commands", vim.log.levels.ERROR)
+    M.set_commands()
     return
   end
 
