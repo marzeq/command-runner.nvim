@@ -30,6 +30,10 @@ using [lazy.nvim](https://github.com/folke/lazy.nvim):
 },
 ```
 
+## demo
+
+https://github.com/user-attachments/assets/ba7bfcb1-661b-4477-980d-4dbc12d1dfad
+
 ## usage
 
 ### setting the commands
