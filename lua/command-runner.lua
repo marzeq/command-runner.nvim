@@ -137,6 +137,81 @@ M.set_commands = function()
   end
 end
 
+local smart_goto_file = function()
+  local file = vim.fn.expand("<cfile>")
+  local line = vim.fn.getline(".")
+  local col = vim.fn.col(".")
+
+  for start = 1, #line do
+    local finish = start + #file - 1
+
+    if col < start or col > finish then
+      goto continue
+    end
+
+    local word = line:sub(start, finish)
+
+    if word ~= file then
+      goto continue
+    end
+
+    local colon = line:sub(finish + 1, finish + 1)
+
+    if colon ~= ":" then
+      vim.cmd("edit " .. file)
+      return
+    end
+
+    local line_num = ""
+    local line_end_i = 0
+
+    for i = finish + 2, #line do
+      local char = line:sub(i, i)
+      if char:match("%d") then
+        line_num = line_num .. char
+      else
+        line_end_i = i
+        break
+      end
+    end
+
+    if line_num == "" then
+      vim.cmd("edit " .. file)
+      return
+    end
+
+    colon = line:sub(line_end_i, line_end_i)
+
+    if colon ~= ":" then
+      vim.cmd("edit " .. file)
+      vim.api.nvim_win_set_cursor(0, { tonumber(line_num), 0 })
+      return
+    end
+
+    local col_num = ""
+
+    for i = line_end_i + 1, #line do
+      local char = line:sub(i, i)
+      if char:match("%d") then
+        col_num = col_num .. char
+      else
+        break
+      end
+    end
+
+    if col_num == "" then
+      vim.cmd("edit " .. file)
+      vim.api.nvim_win_set_cursor(0, { tonumber(line_num), 0 })
+      return
+    end
+
+    vim.cmd("edit " .. file)
+    vim.api.nvim_win_set_cursor(0, { tonumber(line_num), tonumber(col_num) - 1 })
+
+    ::continue::
+  end
+end
+
 ---@param index number|string|nil @The index of the command to run, nil for running all
 M.run_command = function(index)
   local commands = get_commands()
@@ -163,11 +238,13 @@ M.run_command = function(index)
   vim.api.nvim_set_option("splitbelow", original_splitbelow)
   vim.cmd("resize " .. height)
 
-  local buf = vim.api.nvim_create_buf(false, true)
+  local buf = vim.api.nvim_create_buf(true, true)
   vim.api.nvim_set_current_buf(buf)
 
   vim.api.nvim_buf_set_keymap(buf, "n", "<ESC>", "<cmd>close<CR>", { noremap = true, silent = true })
   vim.api.nvim_buf_set_keymap(buf, "n", "q", "<cmd>close<CR>", { noremap = true, silent = true })
+
+  vim.keymap.set("n", "gf", smart_goto_file, { buffer = buf, noremap = true, silent = true })
 
   local joiner = M.config.run_next_on_failure and "; " or " && "
   local shell = vim.o.shell
