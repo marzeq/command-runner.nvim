@@ -46,7 +46,7 @@ end
 local function get_dir_absolute()
   local git_dir = vim.fn.systemlist("git rev-parse --show-toplevel 2> /dev/null")[1]
   if git_dir ~= nil and git_dir ~= "" then
-    return git_dir
+    return git_dir .. "/"
   end
 
   local cwd = vim.fn.getcwd()
