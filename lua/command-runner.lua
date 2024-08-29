@@ -75,7 +75,9 @@ M.set_commands = function()
     height = height,
     row = (vim.o.lines - height) / 2,
     col = (vim.o.columns - width) / 2,
-    border = "single",
+    title = "Commands (each on new line)",
+    title_pos = "center",
+    border = "rounded",
   }
 
   vim.api.nvim_open_win(buf, true, opts)
@@ -83,9 +85,28 @@ M.set_commands = function()
   vim.api.nvim_buf_set_option(buf, "bufhidden", "wipe")
   vim.api.nvim_buf_set_option(buf, "buftype", "nofile")
   vim.api.nvim_buf_set_option(buf, "swapfile", false)
+  vim.api.nvim_buf_set_option(buf, "relativenumber", false)
+  vim.api.nvim_buf_set_option(buf, "number", true)
 
   vim.api.nvim_buf_set_keymap(buf, "n", "<ESC>", "<cmd>close<CR>", { noremap = true, silent = true })
   vim.api.nvim_buf_set_keymap(buf, "n", "q", "<cmd>close<CR>", { noremap = true, silent = true })
+
+  vim.api.nvim_buf_set_keymap(
+    buf,
+    "n",
+    "<CR>",
+    "<cmd>close<CR><cmd>lua require('command-runner').run_command(nil)<CR>",
+    { noremap = true, silent = true }
+  )
+  for i = 1, #cmds do
+    vim.api.nvim_buf_set_keymap(
+      buf,
+      "n",
+      tostring(i),
+      "<cmd>close<CR><cmd>lua require('command-runner').run_command(" .. i .. ")<CR>",
+      { noremap = true, silent = true }
+    )
+  end
 
   vim.api.nvim_create_autocmd({ "BufLeave" }, {
     buffer = buf,
@@ -116,12 +137,22 @@ M.set_commands = function()
   end
 end
 
-M.run_commands = function()
+---@param index number|string|nil @The index of the command to run, nil for running all
+M.run_command = function(index)
   local commands = get_commands()
 
   if #commands == 0 then
     vim.notify("No commands to run", vim.log.levels.ERROR)
     return
+  end
+
+  if index ~= nil then
+    index = tonumber(index)
+
+    if index < 1 or index > #commands then
+      vim.notify("Invalid index", vim.log.levels.ERROR)
+      return
+    end
   end
 
   local height = math.ceil(vim.o.lines * (M.config.split_height / 100))
@@ -146,6 +177,10 @@ M.run_commands = function()
     end, cmds)
 
     return table.concat(mapped, joiner)
+  end
+
+  if index ~= nil then
+    commands = { commands[index] }
   end
 
   vim.fn.termopen({ shell, "-c", concat_commands(commands) })
