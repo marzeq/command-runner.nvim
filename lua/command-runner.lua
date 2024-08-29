@@ -5,6 +5,10 @@ local config = {
   run_next_on_failure = false,
   ---@type number @The height of the command output split (in %) (default: 25)
   split_height = 25,
+  ---@type boolean @Whether to start in insert mode in the Set buffer (default: false)
+  start_insert = false,
+  ---@type boolean @Whether the cursor should be positioned at the end of the buffer in the Set buffer (default: true)
+  start_at_end = true,
 }
 
 local function load_json(filepath)
@@ -54,6 +58,7 @@ local function get_commands()
 end
 
 M.set_commands = function()
+  local cmds = get_commands()
   local buf = vim.api.nvim_create_buf(false, true)
 
   local width = 50
@@ -95,7 +100,15 @@ M.set_commands = function()
     end,
   })
 
-  vim.api.nvim_buf_set_lines(buf, 0, -1, false, get_commands())
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, cmds)
+
+  if M.config.start_at_end and #cmds > 0 then
+    vim.api.nvim_win_set_cursor(0, { #cmds, #cmds[#cmds] })
+  end
+
+  if M.config.start_insert then
+    vim.api.nvim_feedkeys("a", "n", true)
+  end
 end
 
 M.run_commands = function()
