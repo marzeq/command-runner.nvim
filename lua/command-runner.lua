@@ -152,8 +152,6 @@ M.run_commands = function()
 
   vim.api.nvim_feedkeys("i", "n", true)
 
-  vim.cmd("resize " .. height)
-
   vim.api.nvim_buf_set_option(buf, "bufhidden", "wipe")
 end
 
