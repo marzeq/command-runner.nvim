@@ -3,8 +3,10 @@ local Job = require("plenary.job")
 ---@diagnostic disable: deprecated
 ---@class Config
 local config = {
-  ---@type boolean
+  ---@type boolean @Run the next command even if the previous one failed (default: false)
   run_next_on_failure = false,
+  ---@type number @The height of the command output split (in %) (default: 25)
+  split_height = 25,
 }
 
 ---@class MyModule
@@ -71,7 +73,7 @@ M.run_commands = function()
     return
   end
 
-  local height = math.ceil(vim.o.lines * 0.25)
+  local height = math.ceil(vim.o.lines * (M.config.split_height / 100))
   local original_splitbelow = vim.api.nvim_get_option("splitbelow")
   vim.api.nvim_set_option("splitbelow", true)
   vim.cmd("split")

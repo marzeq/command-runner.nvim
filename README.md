@@ -19,7 +19,10 @@ using [lazy.nvim](https://github.com/folke/lazy.nvim):
   depends = { "nvim-lua/plenary.nvim" },
   -- these are the default options, you don't need to include them if you don't want to change them
   opts = {
+    -- Run the next command even if the previous one failed (default: false)
     run_next_on_failure = false,
+    -- The height of the command output split (in %)
+    split_height = 25,
   },
 },
 ```
