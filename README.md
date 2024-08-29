@@ -16,7 +16,6 @@ using [lazy.nvim](https://github.com/folke/lazy.nvim):
 ```lua
 {
   "marzeq/command-runner.nvim",
-  depends = { "nvim-lua/plenary.nvim" },
   -- these are the default options, you don't need to include them if you don't want to change them
   opts = {
     -- Run the next command even if the previous one failed (default: false)
@@ -38,6 +37,8 @@ when you're done, press `<esc>` or `q` to close the popup window.
 
 if you ever want to change the commands, you can run it again, and the commands will appear there again for you to edit.
 
+each directory has it's own set of commands, so you can have different sets of commands for different projects. they are persistent across sessions.
+
 ### running the commands
 
 to run the commands, run `:CommandRunnerRun` or use the equivalent lua function `require("command-runner").run_commands`.
@@ -51,8 +52,6 @@ none currently
 ## credits
 
 - me
-- [plenary.nvim](https://github.com/nvim-lua/plenary.nvim) for plenary.job (which is a godsend btw)
-- [dromozoa](https://github.com/dromozoa/dromozoa-shlex) for the shlex.lua library
 
 ## license & usage
 
