@@ -66,88 +66,6 @@ M.set_commands = function()
 end
 
 M.run_commands = function()
-  -- yoinked from https://github.com/dromozoa/dromozoa-shlex
-  local function split(s)
-    local SQ = 0x27
-    local DQ = 0x22
-    local SP = 0x20
-    local HT = 0x09
-    local LF = 0x0A
-    local CR = 0x0D
-    local BS = 0x5C
-
-    local token
-    local state
-    local escape = false
-    local result = {}
-    for i = 1, #s do
-      local c = s:byte(i)
-      local v = string.char(c)
-      if state == SQ then
-        if c == SQ then
-          state = nil
-        else
-          token[#token + 1] = v
-        end
-      elseif state == DQ then
-        if escape then
-          if c == DQ or c == BS then
-            token[#token + 1] = v
-          else
-            token[#token + 1] = "\\"
-            token[#token + 1] = v
-          end
-          escape = false
-        else
-          if c == DQ then
-            state = nil
-          elseif c == BS then
-            escape = true
-          else
-            token[#token + 1] = v
-          end
-        end
-      else
-        if escape then
-          token[#token + 1] = v
-          escape = false
-        else
-          if c == SP or c == HT or c == LF or c == CR then
-            if token ~= nil then
-              result[#result + 1] = table.concat(token)
-              token = nil
-            end
-          else
-            if token == nil then
-              token = {}
-            end
-            if c == SQ then
-              state = SQ
-            elseif c == DQ then
-              state = DQ
-            elseif c == BS then
-              escape = true
-            else
-              token[#token + 1] = v
-            end
-          end
-        end
-      end
-    end
-
-    if state ~= nil then
-      error("no closing quotation")
-    end
-    if escape then
-      error("no escaped character")
-    end
-
-    if token ~= nil then
-      result[#result + 1] = table.concat(token)
-    end
-    return result
-  end
-
   if #M.commands == 0 then
     vim.notify("No commands to run", vim.log.levels.ERROR)
     return
@@ -161,74 +79,34 @@ M.run_commands = function()
   vim.cmd("resize " .. height)
 
   local buf = vim.api.nvim_create_buf(false, true)
-
-  vim.api.nvim_buf_set_option(buf, "bufhidden", "wipe")
-  vim.api.nvim_buf_set_option(buf, "modifiable", false)
   vim.api.nvim_set_current_buf(buf)
 
-  local function write_to_buffer(b, word)
-    vim.schedule(function()
-      vim.api.nvim_buf_set_option(b, "modifiable", true)
-      -- check if the buffer contains absolutelely nothing, to avoid adding a newline at the beginning
-      if vim.api.nvim_buf_get_lines(b, 0, -1, false)[1] == "" then
-        vim.api.nvim_buf_set_lines(b, 0, -1, false, { word })
-      else
-        vim.api.nvim_buf_set_lines(b, -1, -1, false, { word })
-      end
-      vim.api.nvim_buf_set_option(b, "modifiable", false)
-    end)
+  vim.api.nvim_buf_set_keymap(buf, "n", "<ESC>", "<cmd>close<CR>", { noremap = true, silent = true })
+  vim.api.nvim_buf_set_keymap(buf, "n", "q", "<cmd>close<CR>", { noremap = true, silent = true })
+
+  local joiner = M.config.run_next_on_failure and "; " or " && "
+  local shell = vim.o.shell
+
+  local function concat_commands()
+    local commands = vim.tbl_map(function(command)
+      return "echo 'Running command: " .. command .. "' && " .. command .. " && echo '\n'"
+    end, M.commands)
+
+    return table.concat(commands, joiner)
   end
 
-  local function handle_output(icmd)
-    local cmd = M.commands[icmd]
-    write_to_buffer(buf, "> " .. cmd)
-    vim.notify("Running command: " .. cmd, vim.log.levels.INFO)
+  vim.fn.termopen({ shell, "-c", concat_commands() }, {
+    on_stdout = function()
+      vim.api.nvim_win_set_cursor(0, { vim.api.nvim_buf_line_count(buf), 0 })
+    end,
+    on_stderr = function()
+      vim.api.nvim_win_set_cursor(0, { vim.api.nvim_buf_line_count(buf), 0 })
+    end,
+  })
 
-    local parts = split(cmd)
+  vim.cmd("resize " .. height)
 
-    local command = parts[1]
-    local args = {}
-    for i = 2, #parts do
-      args[i - 1] = parts[i]
-    end
-
-    local job = Job:new({
-      command = command,
-      args = args,
-      on_stdout = function(_, data)
-        write_to_buffer(buf, data)
-      end,
-      on_stderr = function(_, data)
-        write_to_buffer(buf, data)
-      end,
-      on_exit = function(_, code)
-        if code == 0 then
-          vim.notify("Command: `" .. cmd .. "` ran successfully", vim.log.levels.INFO)
-        else
-          vim.notify("Command: `" .. cmd .. "` failed with exit code: " .. code, vim.log.levels.ERROR)
-        end
-        write_to_buffer(buf, "")
-      end,
-    })
-
-    job:start()
-
-    if icmd == #M.commands then
-      return
-    end
-
-    if M.config.run_next_on_failure then
-      job:after(function()
-        handle_output(icmd + 1)
-      end)
-    else
-      job:after_success(function()
-        handle_output(icmd + 1)
-      end)
-    end
-  end
-
-  handle_output(1)
+  vim.api.nvim_buf_set_option(buf, "bufhidden", "wipe")
 end
 
 return M

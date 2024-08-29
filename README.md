@@ -43,7 +43,7 @@ it's pretty straight forward, i think i already explained it well in the introdu
 
 ## known limitations
 
-if you need stdin support, your only option is to pipe echo into the command in question
+none currently
 
 ## credits
 
