@@ -1,6 +1,5 @@
 ---@diagnostic disable: deprecated
 local M = require("command-runner")
-local socket = require("socket")
 local uv = vim.loop
 
 local MAX_BYTES = 16 * 1024
@@ -46,7 +45,7 @@ local function parse_message(msg)
   end
 end
 
----@param client uv_tcp_t @The TCP client (a uv_tcp_t handle)
+---@param client unknown @The TCP client (a uv_tcp_t handle)
 ---@param msg string @Message to send to the server
 ---@param callback function @Callback to handle the response or error
 local function send_message(client, msg, callback)
