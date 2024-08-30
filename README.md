@@ -2,7 +2,7 @@
 
 a neovim plugin that provides a UI for setting a persistent set of commands that you can then run with a keybinding or vim command without having to type them out each time
 
-you can input the commmands in a popup window (each one on a new line) and then when you run them, the result will appear in a new buffer below the current one
+you can input the commmands in a popup window (each one on a new line) and then you can run one of them or all of them in sequence
 
 ## why use this?
 
@@ -26,9 +26,16 @@ using [lazy.nvim](https://github.com/folke/lazy.nvim):
     start_insert = false,
     -- Whether the cursor should be positioned at the end of the buffer in the Set buffer
     start_at_end = true,
+    ---What backend to use ("native" or "redr") (default: "native")
+    backend = "native",
   },
 },
 ```
+
+the native backend is the default one, where everything is done in neovim (this is the one displayed in the demo)
+
+[redr](https://github.com/marzeq/redr) is my own command runner that i wrote in go specifically for this project. it runs over tcp sockets to communicate with neovim, and has the advantage of being a separate plugin.
+it's still pretty wip, but it's already usable. if you want to use it, (for now) please build it yourself (instructions in repo). when you want to use it, run the `redr` binary and then set the backend to "redr" in the opts.
 
 ## demo
 
