@@ -63,7 +63,8 @@ local function smart_goto_file()
 end
 
 ---@param commands string[]
-local function run_command(commands)
+---@param _ string cwd
+local function run_command(commands, _)
   local height = math.ceil(vim.o.lines * (M.config.split_height / 100))
   local original_splitbelow = vim.api.nvim_get_option("splitbelow")
   vim.api.nvim_set_option("splitbelow", true)

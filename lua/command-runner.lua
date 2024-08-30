@@ -164,10 +164,10 @@ M.run_command = function(index)
 
   if M.config.backend == "native" then
     local backend = require("backends.native")
-    backend.run_command(commands)
+    backend.run_command(commands, get_dir_absolute())
   elseif M.config.backend == "redr" then
     local backend = require("backends.redr")
-    backend.run_command(commands)
+    backend.run_command(commands, get_dir_absolute())
   else
     vim.notify("Invalid backend", vim.log.levels.ERROR)
   end

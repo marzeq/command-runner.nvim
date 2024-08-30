@@ -5,9 +5,11 @@ local socket = require("socket")
 local MAX_BYTES = 16 * 1024
 local REDR_PORT = 45673
 
-local function introduce_message()
+---@param cwd string
+local function introduce_message(cwd)
   return vim.json.encode({
     type = "introduce",
+    cwd = cwd,
   }) .. "\n"
 end
 
@@ -64,7 +66,8 @@ local function send_message(client, msg)
 end
 
 ---@param commands string[]
-local function run_command(commands)
+---@param cwd string
+local function run_command(commands, cwd)
   for _, command in ipairs(commands) do
     if #commands + 100 > MAX_BYTES then
       vim.notify("Command `" .. command .. "` exceeds 16KB limit", vim.log.levels.ERROR)
@@ -86,7 +89,7 @@ local function run_command(commands)
     return
   end
 
-  local introduce, introduce_err = send_message(client, introduce_message())
+  local introduce, introduce_err = send_message(client, introduce_message(cwd))
   if introduce_err ~= nil then
     vim.notify("Error introducing to redr server: " .. vim.inspect(introduce_err), vim.log.levels.ERROR)
     client:close()
