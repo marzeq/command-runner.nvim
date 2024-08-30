@@ -34,7 +34,7 @@ using [lazy.nvim](https://github.com/folke/lazy.nvim):
 
 the native backend is the default one, where everything is done in neovim (this is the one displayed in the demo)
 
-[redr](https://github.com/marzeq/redr) is my own command runner that i wrote in go specifically for this project. it runs over tcp sockets to communicate with neovim, and has the advantage of being a separate plugin.
+[redr](https://github.com/marzeq/redr) is my own command runner that i wrote in go specifically for this project. it runs over tcp sockets to communicate with neovim, and has the advantage of being a separate window that you can tile however you want.
 it's still pretty wip, but it's already usable. if you want to use it, (for now) please build it yourself (instructions in repo). when you want to use it, run the `redr` binary and then set the backend to "redr" in the opts.
 
 ## demo
