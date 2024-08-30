@@ -137,78 +137,68 @@ M.set_commands = function()
   end
 end
 
-local smart_goto_file = function()
-  local file = vim.fn.expand("<cfile>")
+local function find_locations(str, pattern)
+  local results = {}
+  local start_pos = 1
+
+  while true do
+    local s, e, _ = string.find(str, pattern, start_pos)
+    if not s then
+      break
+    end
+    table.insert(results, { start_index = s, end_index = e })
+    start_pos = e + 1
+  end
+
+  return results
+end
+
+local function smart_goto_file()
   local line = vim.fn.getline(".")
   local col = vim.fn.col(".")
 
-  for start = 1, #line do
-    local finish = start + #file - 1
+  local pattern_full = "([^:%s]+):(%d+):(%d+)"
+  local pattern_partial = "([^:%s]+):(%d+)"
 
-    if col < start or col > finish then
-      goto continue
-    end
-
-    local word = line:sub(start, finish)
-
-    if word ~= file then
-      goto continue
-    end
-
-    local colon = line:sub(finish + 1, finish + 1)
-
-    if colon ~= ":" then
-      vim.cmd("edit " .. file)
-      return
-    end
-
-    local line_num = ""
-    local line_end_i = 0
-
-    for i = finish + 2, #line do
-      local char = line:sub(i, i)
-      if char:match("%d") then
-        line_num = line_num .. char
-      else
-        line_end_i = i
-        break
+  local open_file = function(filename, linenum, columnnum)
+    vim.notify(
+      "Opening " .. filename .. " at line " .. linenum .. (columnnum and " and column " .. columnnum or ""),
+      vim.log.levels.INFO
+    )
+    vim.cmd(string.format("edit +%d %s", linenum, filename))
+    if columnnum then
+      if columnnum > vim.fn.strdisplaywidth(vim.fn.getline(linenum)) then
+        columnnum = vim.fn.strdisplaywidth(vim.fn.getline(linenum))
+      elseif columnnum < 1 then
+        columnnum = 1
       end
+      vim.cmd(string.format("normal! %d|", columnnum))
     end
+  end
 
-    if line_num == "" then
-      vim.cmd("edit " .. file)
+  local finds = find_locations(line, pattern_full)
+  for _, find_info in ipairs(finds) do
+    if col >= find_info.start_index and col <= find_info.end_index then
+      local match = string.sub(line, find_info.start_index, find_info.end_index)
+      local filename, l, c = string.match(match, pattern_full)
+      open_file(filename, tonumber(l), tonumber(c))
       return
     end
+  end
 
-    colon = line:sub(line_end_i, line_end_i)
-
-    if colon ~= ":" then
-      vim.cmd("edit " .. file)
-      vim.api.nvim_win_set_cursor(0, { tonumber(line_num), 0 })
+  finds = find_locations(line, pattern_partial)
+  for _, find_info in ipairs(finds) do
+    if col >= find_info.start_index and col <= find_info.end_index then
+      local match = string.sub(line, find_info.start_index, find_info.end_index)
+      local filename, l = string.match(match, pattern_partial)
+      open_file(filename, tonumber(l))
       return
     end
+  end
 
-    local col_num = ""
-
-    for i = line_end_i + 1, #line do
-      local char = line:sub(i, i)
-      if char:match("%d") then
-        col_num = col_num .. char
-      else
-        break
-      end
-    end
-
-    if col_num == "" then
-      vim.cmd("edit " .. file)
-      vim.api.nvim_win_set_cursor(0, { tonumber(line_num), 0 })
-      return
-    end
-
-    vim.cmd("edit " .. file)
-    vim.api.nvim_win_set_cursor(0, { tonumber(line_num), tonumber(col_num) - 1 })
-
-    ::continue::
+  local cfile = vim.fn.expand("<cfile>")
+  if cfile ~= "" then
+    vim.cmd("edit " .. cfile)
   end
 end
 
