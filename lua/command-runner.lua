@@ -9,7 +9,7 @@ local config = {
   start_insert = false,
   ---@type boolean @Whether the cursor should be positioned at the end of the buffer in the Set buffer (default: true)
   start_at_end = true,
-  ---@type "native" @What backend to use ("native") (default: "native")
+  ---@type "native"|"redr" @What backend to use ("native" or "redr") (default: "native")
   backend = "native",
 }
 
@@ -165,6 +165,11 @@ M.run_command = function(index)
   if M.config.backend == "native" then
     local backend = require("backends.native")
     backend.run_command(commands)
+  elseif M.config.backend == "redr" then
+    local backend = require("backends.redr")
+    backend.run_command(commands)
+  else
+    vim.notify("Invalid backend", vim.log.levels.ERROR)
   end
 end
 

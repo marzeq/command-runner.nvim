@@ -25,10 +25,6 @@ local function smart_goto_file()
   local pattern_partial = "([^:%s]+):(%d+)"
 
   local open_file = function(filename, linenum, columnnum)
-    vim.notify(
-      "Opening " .. filename .. " at line " .. linenum .. (columnnum and " and column " .. columnnum or ""),
-      vim.log.levels.INFO
-    )
     vim.cmd(string.format("edit +%d %s", linenum, filename))
     if columnnum then
       if columnnum > vim.fn.strdisplaywidth(vim.fn.getline(linenum)) then
