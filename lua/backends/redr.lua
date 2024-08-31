@@ -82,6 +82,7 @@ end
 
 ---@param commands string[]
 ---@param cwd string
+---@return "need_fallback"|nil
 local function run_command(commands, cwd)
   for _, command in ipairs(commands) do
     if #commands + 100 > MAX_BYTES then
@@ -90,18 +91,28 @@ local function run_command(commands, cwd)
     end
   end
 
+  local function backup_run_command(commands, cwd)
+    vim.schedule(function()
+      local backend = require("backends.native")
+      backend.run_command(commands, cwd)
+    end)
+  end
+
+  ---@diagnostic disable-next-line: undefined-field
   local client = uv.new_tcp()
   client:connect("127.0.0.1", REDR_PORT, function(connect_err)
     if connect_err then
       vim.notify("Error connecting to redr server: " .. connect_err, vim.log.levels.ERROR)
       client:close()
+      backup_run_command(commands, cwd)
       return
     end
 
     send_message(client, introduce_message(cwd), function(introduce_res, introduce_err)
       if introduce_err then
-        vim.notify("Error introducing to redr server: " .. introduce_err, vim.log.levels.ERROR)
+        vim.notify("Error connecting to redr server: " .. introduce_err, vim.log.levels.ERROR)
         client:close()
+        backup_run_command(commands, cwd)
         return
       end
 
@@ -156,12 +167,10 @@ local function run_command(commands, cwd)
             end
           end
 
-          -- Process the next command in the list
           process_command(index + 1)
         end)
       end
 
-      -- Start processing commands from the first one
       process_command(1)
     end)
   end)
