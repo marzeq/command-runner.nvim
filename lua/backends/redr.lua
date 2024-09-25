@@ -27,7 +27,7 @@ local function bye_message()
 end
 
 ---@param msg string
----@return {type: "ok"}|{type: "command_ran", exit_code: number}|nil
+---@return {type: "ok"}|{type: "command_ran", exit_code: number}|{type: "kick_off"}|nil
 local function parse_message(msg)
   local decoded = vim.json.decode(msg)
 
@@ -39,6 +39,10 @@ local function parse_message(msg)
     return {
       type = "command_ran",
       exit_code = tonumber(decoded.exit_code),
+    }
+  elseif decoded.type == "kick_off" then
+    return {
+      type = "kick_off",
     }
   else
     return nil
@@ -118,6 +122,9 @@ local function run_command(commands, cwd)
 
       local introduce_parsed = parse_message(introduce_res)
       if introduce_parsed == nil or introduce_parsed.type ~= "ok" then
+        if introduce_parsed ~= nil and introduce_parsed.type == "kick_off" then
+          return
+        end
         vim.notify("Error parsing response from redr server: " .. vim.inspect(introduce_res), vim.log.levels.ERROR)
         send_message(client, bye_message(), function()
           client:close()
@@ -147,6 +154,9 @@ local function run_command(commands, cwd)
 
           local parsed = parse_message(res)
           if parsed == nil or parsed.type ~= "command_ran" then
+            if parsed ~= nil and parsed.type == "kick_off" then
+              return
+            end
             vim.notify("Error parsing response from redr server: " .. vim.inspect(res), vim.log.levels.ERROR)
             send_message(client, bye_message(), function()
               client:close()
