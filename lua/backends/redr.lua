@@ -144,7 +144,6 @@ local function run_command(commands, cwd)
         return
       end
 
-      -- Send the commands
       send_message(client, run_commands_message(commands), function(run_commands_res, run_commands_err)
         if run_commands_err then
           vim.notify("Error sending run_commands message: " .. run_commands_err, vim.log.levels.ERROR)
@@ -153,7 +152,6 @@ local function run_command(commands, cwd)
           return
         end
 
-        -- parse the response
         local command_parsed = parse_message(run_commands_res)
         if command_parsed == nil or command_parsed.type ~= "command_ran" then
           vim.notify("Error parsing response from redr server: " .. vim.inspect(run_commands_res), vim.log.levels.ERROR)
@@ -163,7 +161,7 @@ local function run_command(commands, cwd)
           return
         end
 
-        if command_parsed.exit_code ~= 0 and not run_next_after_failure then
+        if command_parsed.exit_code ~= 0 then
           vim.notify(
             "Command `" .. commands[1] .. "` failed with exit code " .. command_parsed.exit_code,
             vim.log.levels.ERROR
@@ -193,7 +191,7 @@ local function run_command(commands, cwd)
 
             if command_parsed.type == "command_ran" then
               local command = commands[i]
-              if command_parsed.exit_code ~= 0 and not run_next_after_failure then
+              if command_parsed.exit_code ~= 0 then
                 vim.notify(
                   "Command `" .. command .. "` failed with exit code " .. command_parsed.exit_code,
                   vim.log.levels.ERROR
@@ -206,7 +204,6 @@ local function run_command(commands, cwd)
               vim.notify("Command `" .. command .. "` ran successfully", vim.log.levels.INFO)
               process_command_result(i + 1)
             elseif command_parsed.type == "ok" then
-              -- All commands done, exit the loop
               send_message(client, bye_message(), function()
                 client:close()
               end)
@@ -214,7 +211,6 @@ local function run_command(commands, cwd)
           end)
         end
 
-        -- Start processing the command results
         process_command_result(2)
       end)
     end)
