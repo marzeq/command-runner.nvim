@@ -41,7 +41,7 @@ it's still pretty wip, but it's already usable. if you want to use it, (for now)
 
 if you're worried about bloat, only the backend you're using is loaded
 
-a tmux backend is also planned
+<!-- a tmux backend is also planned -->
 
 ## demo
 
