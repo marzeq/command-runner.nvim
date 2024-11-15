@@ -11,6 +11,8 @@ local config = {
   start_at_end = true,
   ---@type "native"|"redr" @What backend to use ("native" or "redr") (default: "native")
   backend = "native",
+  ---@type boolean @Whether to display "could not connect to redr" messages (default: true)
+  redr_show_could_not_connect = true,
 }
 
 local function load_json(filepath)

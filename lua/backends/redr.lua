@@ -6,23 +6,31 @@ local MAX_BYTES = 16 * 1024
 local REDR_PORT = 45673
 
 ---@param cwd string
-local function introduce_message(cwd)
+---@param run_next_after_failure boolean
+local function introduce_message(cwd, run_next_after_failure)
   return vim.json.encode({
     type = "introduce",
     cwd = cwd,
+    run_next_after_failure = run_next_after_failure,
   }) .. "\n"
 end
 
-local function run_command_message(command)
+local function run_commands_message(commands)
   return vim.json.encode({
-    type = "run_command",
-    command = command,
+    type = "run_commands",
+    commands = commands,
   }) .. "\n"
 end
 
 local function bye_message()
   return vim.json.encode({
     type = "bye",
+  }) .. "\n"
+end
+
+local function ok_message()
+  return vim.json.encode({
+    type = "ok",
   }) .. "\n"
 end
 
@@ -106,15 +114,19 @@ local function run_command(commands, cwd)
   local client = uv.new_tcp()
   client:connect("127.0.0.1", REDR_PORT, function(connect_err)
     if connect_err then
-      vim.notify("Error connecting to redr server: " .. connect_err, vim.log.levels.ERROR)
+      if M.config.redr_show_could_not_connect then
+        vim.notify("Could not connect to redr server", vim.log.levels.ERROR)
+      end
       client:close()
       backup_run_command(commands, cwd)
       return
     end
 
-    send_message(client, introduce_message(cwd), function(introduce_res, introduce_err)
+    send_message(client, introduce_message(cwd, M.config.run_next_on_failure), function(introduce_res, introduce_err)
       if introduce_err then
-        vim.notify("Error connecting to redr server: " .. introduce_err, vim.log.levels.ERROR)
+        if M.config.redr_show_could_not_connect then
+          vim.notify("Error sending introduce message: " .. introduce_err, vim.log.levels.ERROR)
+        end
         client:close()
         backup_run_command(commands, cwd)
         return
@@ -132,56 +144,79 @@ local function run_command(commands, cwd)
         return
       end
 
-      local function process_command(index)
-        if index > #commands then
+      -- Send the commands
+      send_message(client, run_commands_message(commands), function(run_commands_res, run_commands_err)
+        if run_commands_err then
+          vim.notify("Error sending run_commands message: " .. run_commands_err, vim.log.levels.ERROR)
+          client:close()
+          backup_run_command(commands, cwd)
+          return
+        end
+
+        -- parse the response
+        local command_parsed = parse_message(run_commands_res)
+        if command_parsed == nil or command_parsed.type ~= "command_ran" then
+          vim.notify("Error parsing response from redr server: " .. vim.inspect(run_commands_res), vim.log.levels.ERROR)
           send_message(client, bye_message(), function()
             client:close()
           end)
           return
         end
 
-        local command = commands[index]
-        local msg = run_command_message(command)
+        if command_parsed.exit_code ~= 0 and not run_next_after_failure then
+          vim.notify(
+            "Command `" .. commands[1] .. "` failed with exit code " .. command_parsed.exit_code,
+            vim.log.levels.ERROR
+          )
+          send_message(client, bye_message(), function()
+            client:close()
+          end)
+          return
+        end
 
-        send_message(client, msg, function(res, err)
-          if err then
-            vim.notify("Error receiving response from redr server: " .. err, vim.log.levels.ERROR)
-            send_message(client, bye_message(), function()
+        vim.notify("Command `" .. commands[1] .. "` ran successfully", vim.log.levels.INFO)
+
+        local function process_command_result(i)
+          send_message(client, ok_message(), function(command_res, command_err)
+            if command_err then
+              vim.notify("Error acknowledging command result: " .. command_err, vim.log.levels.ERROR)
               client:close()
-            end)
-            return
-          end
-
-          local parsed = parse_message(res)
-          if parsed == nil or parsed.type ~= "command_ran" then
-            if parsed ~= nil and parsed.type == "kick_off" then
               return
             end
-            vim.notify("Error parsing response from redr server: " .. vim.inspect(res), vim.log.levels.ERROR)
-            send_message(client, bye_message(), function()
-              client:close()
-            end)
-            return
-          end
 
-          local exit_code = parsed.exit_code
-          if exit_code == 0 then
-            vim.notify("Command `" .. command .. "` ran successfully", vim.log.levels.INFO)
-          else
-            vim.notify("Command `" .. command .. "` failed with exit code " .. exit_code, vim.log.levels.ERROR)
-            if not M.config.run_next_on_failure then
+            ---@diagnostic disable-next-line: redefined-local
+            local command_parsed = parse_message(command_res)
+            if command_parsed == nil then
+              vim.notify("Unexpected response from server: " .. vim.inspect(command_res), vim.log.levels.ERROR)
+              return
+            end
+
+            if command_parsed.type == "command_ran" then
+              local command = commands[i]
+              if command_parsed.exit_code ~= 0 and not run_next_after_failure then
+                vim.notify(
+                  "Command `" .. command .. "` failed with exit code " .. command_parsed.exit_code,
+                  vim.log.levels.ERROR
+                )
+                send_message(client, bye_message(), function()
+                  client:close()
+                end)
+                return
+              end
+              vim.notify("Command `" .. command .. "` ran successfully", vim.log.levels.INFO)
+              process_command_result(i + 1)
+            elseif command_parsed.type == "ok" then
+              -- All commands done, exit the loop
               send_message(client, bye_message(), function()
                 client:close()
               end)
-              return
             end
-          end
+          end)
+        end
 
-          process_command(index + 1)
-        end)
-      end
-
-      process_command(1)
+        -- Start processing the command results
+        process_command_result(2)
+      end)
     end)
   end)
 end
