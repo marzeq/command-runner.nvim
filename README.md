@@ -28,6 +28,8 @@ using [lazy.nvim](https://github.com/folke/lazy.nvim):
     start_at_end = true,
     -- What backend to use ("native" or "redr") (default: "native")
     backend = "native",
+    -- Whether to display "could not connect to redr" messages (default: true)
+    redr_show_could_not_connect = true,
   },
 },
 ```
@@ -41,35 +43,26 @@ it's still pretty wip, but it's already usable. if you want to use it, (for now)
 
 if you're worried about bloat, only the backend you're using is loaded
 
-<!-- a tmux backend is also planned -->
-
 ## demo
 
 https://github.com/user-attachments/assets/ba7bfcb1-661b-4477-980d-4dbc12d1dfad
 
-## usage
+## usage (lua api/vim commands)
 
-### setting the commands
+you can get access to lua api by requiring `"command-runner"` in your lua code, for example: `require("command-runner").set_commands()`
 
-to set the commands, run `:CommandRunnerSet` and input the commands in the popup window that appears.
-you can also use the lua `require("command-runner").set_commands` function to do the same thing.
 
-when you're done, press `<esc>` or `q` to close the popup window.
+| lua function                                 | vim command                                            | shortcut in set buffer/window | description                                                           |
+|----------------------------------------------|--------------------------------------------------------|-------------------------------|-----------------------------------------------------------------------|
+| `set_commands()`                             | `:CommandRunnerSet`                                    |                               | opens the set buffer/window. press `<esc>` or `q` to close it         |
+| `run_command(index: number)`                 | `:CommandRunnerRun {index}`                            | corresponding number `[1..9]` | runs the command at the given index                                   |
+| `run_command_select_ui()`                    | `:CommandRunnerRun`                                    |                               | opens a popup window with the commands, and you can select one to run |
+| `run_all_commands()`                         | `:CommandRunnerRunAll`                                 | `<CR>`                        | runs all the commands in sequence                                     |
+| `run_arbitrary_command(command: string)`     | `:CommandRunnerRunArbitrary {command}`                 |                               | runs the given command                                                |
+| `run_arbitrary_commands(commands: string[])` | `:CommandRunnerRunArbitrary {command1} {command2} ...` |                               | runs the given commands in sequence                                   |
+| `run_arbitrary_ui()`                         | `:CommandRunnerRunArbitrary`                           |                               | opens a popup window where you can input a command to run             |
 
-if you ever want to change the commands, you can run it again, and the commands will appear there again for you to edit.
-
-each project has it's own set of commands that are persistent accross sessions. if you are inside a git repo, the root of the repo will be stored, so no matter how deep you are in the project tree, the commands will be the same.
-otherwise, the current working directory will be used as a fallback.
-
-### running the commands
-
-to a specific command, run `:CommandRunnerRun {index}` or use the equivalent lua function `require("command-runner").run_command(index)`.
-you can also press the index of the command in the Set buffer while in normal mode to run it (obviously onlt works for indices 1-9).
-
-to run all the commands one after the other, run `:CommandRunnerRunAll` or use the equivalent lua function `require("command-runner").run_command(nil)`.
-when in the Set buffer, pressing `<CR>` in normal mode will do the same thing.
-
-it's pretty straight forward, i think i already explained it well in the introduction.
+with the exception of `run_arbitrary_*` functions, all the functions will open the set buffer if no commands are set and will need to be ran again after setting the commands
 
 ## known limitations
 

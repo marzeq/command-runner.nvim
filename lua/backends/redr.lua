@@ -95,7 +95,7 @@ end
 ---@param commands string[]
 ---@param cwd string
 ---@return "need_fallback"|nil
-local function run_command(commands, cwd)
+local function run_commands(commands, cwd)
   for _, command in ipairs(commands) do
     if #commands + 100 > MAX_BYTES then
       vim.notify("Command `" .. command .. "` exceeds 16KB limit", vim.log.levels.ERROR)
@@ -106,7 +106,7 @@ local function run_command(commands, cwd)
   local function backup_run_command(commands, cwd)
     vim.schedule(function()
       local backend = require("backends.native")
-      backend.run_command(commands, cwd)
+      backend.run_commands(commands, cwd)
     end)
   end
 
@@ -218,5 +218,5 @@ local function run_command(commands, cwd)
 end
 
 return {
-  run_command = run_command,
+  run_commands = run_commands,
 }

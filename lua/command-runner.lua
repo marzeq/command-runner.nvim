@@ -99,10 +99,10 @@ M.set_commands = function()
     buf,
     "n",
     "<CR>",
-    "<cmd>close<CR><cmd>lua require('command-runner').run_command(nil)<CR>",
+    "<cmd>close<CR><cmd>lua require('command-runner').run_all_commands()<CR>",
     { noremap = true, silent = true }
   )
-  for i = 1, #cmds do
+  for i = 1, 9 do
     vim.api.nvim_buf_set_keymap(
       buf,
       "n",
@@ -141,38 +141,102 @@ M.set_commands = function()
   end
 end
 
----@param index number|string|nil @The index of the command to run, nil for running all
-M.run_command = function(index)
+M.check_set_commands = function()
   local commands = M.get_commands()
 
   if #commands == 0 then
     vim.notify("No commands to run, opening setter window to set commands", vim.log.levels.ERROR)
     M.set_commands()
-    return
+    return false
   end
 
-  if index ~= nil then
-    index = tonumber(index)
+  return true
+end
 
-    if index < 1 or index > #commands then
-      vim.notify("Invalid index", vim.log.levels.ERROR)
-      return
-    end
-  end
-
-  if index ~= nil then
-    commands = { commands[index] }
-  end
-
+---@param commands string[] @The commands to run
+M.run_arbitrary_commands = function(commands)
   if M.config.backend == "native" then
     local backend = require("backends.native")
-    backend.run_command(commands, get_dir_absolute())
+    backend.run_commands(commands, get_dir_absolute())
   elseif M.config.backend == "redr" then
     local backend = require("backends.redr")
-    backend.run_command(commands, get_dir_absolute())
+    backend.run_commands(commands, get_dir_absolute())
   else
     vim.notify("Invalid backend", vim.log.levels.ERROR)
   end
+end
+
+---@param command string @The command to run
+M.run_arbitrary_command = function(command)
+  M.run_arbitrary_commands({ command })
+end
+
+M.run_arbitrary_ui = function()
+  vim.ui.input({
+    prompt = "Enter command: ",
+    default = "",
+  }, function(input)
+    if input == nil or input == "" then
+      vim.notify("No command entered", vim.log.levels.ERROR)
+      return
+    end
+
+    M.run_arbitrary_command(input)
+  end)
+end
+
+---@param index number @The index of the command to run, nil for running all
+M.run_command = function(index)
+  local commands = M.get_commands()
+
+  if not M.check_set_commands() then
+    return
+  end
+
+  if index < 1 or index > #commands then
+    vim.notify("Invalid index, must be in range [1.." .. #commands .. "]", vim.log.levels.ERROR)
+    return
+  end
+
+  M.run_arbitrary_commands({ commands[index] })
+end
+
+M.run_command_select_ui = function()
+  local commands = M.get_commands()
+
+  if not M.check_set_commands() then
+    return
+  end
+
+  local indexes = {}
+
+  for i, _ in ipairs(commands) do
+    table.insert(indexes, tostring(i))
+  end
+
+  vim.ui.select(indexes, {
+    prompt = "Select command to run: ",
+    format_item = function(item)
+      return item .. ": " .. commands[tonumber(item)]
+    end,
+  }, function(choice)
+    if choice == nil then
+      return
+    end
+
+    ---@diagnostic disable-next-line: param-type-mismatch
+    M.run_command(tonumber(choice))
+  end)
+end
+
+M.run_all_commands = function()
+  local commands = M.get_commands()
+
+  if not M.check_set_commands() then
+    return
+  end
+
+  M.run_arbitrary_commands(commands)
 end
 
 return M
