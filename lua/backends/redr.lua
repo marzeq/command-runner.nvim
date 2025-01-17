@@ -5,39 +5,28 @@ local uv = vim.loop
 local MAX_BYTES = 16 * 1024
 local REDR_PORT = 45673
 
+---@param commands string[]
 ---@param cwd string
 ---@param run_next_after_failure boolean
-local function introduce_message(cwd, run_next_after_failure)
+local function run_message(commands, cwd, run_next_after_failure)
   return vim.json.encode({
-    type = "introduce",
+    type = "run",
+    commands = commands,
     cwd = cwd,
     run_next_after_failure = run_next_after_failure,
   }) .. "\n"
 end
 
-local function run_commands_message(commands)
+local function ignore_message()
   return vim.json.encode({
-    type = "run_commands",
-    commands = commands,
-  }) .. "\n"
-end
-
-local function bye_message()
-  return vim.json.encode({
-    type = "bye",
-  }) .. "\n"
-end
-
-local function ok_message()
-  return vim.json.encode({
-    type = "ok",
+    type = "ignore",
   }) .. "\n"
 end
 
 ---@param msg string
----@return {type: "ok"}|{type: "command_ran", exit_code: number}|{type: "kick_off"}|nil
+---@return {type: "ok"}|{type: "command_ran", exit_code: number, cmd: string, last: boolean, silent: boolean}|{type: "done"}|nil
 local function parse_message(msg)
-  local decoded = vim.json.decode(msg)
+  local decoded = vim.json.decode(msg:match("([^\n]*)"))
 
   if decoded.type == "ok" then
     return {
@@ -47,10 +36,9 @@ local function parse_message(msg)
     return {
       type = "command_ran",
       exit_code = tonumber(decoded.exit_code),
-    }
-  elseif decoded.type == "kick_off" then
-    return {
-      type = "kick_off",
+      cmd = tostring(decoded.cmd),
+      last = decoded.last,
+      silent = decoded.silent,
     }
   else
     return nil
@@ -68,9 +56,7 @@ local function send_message(client, msg, callback)
     end
 
     local buf = ""
-    local read_cb
-
-    read_cb = function(err, chunk)
+    local function read_cb(err, chunk)
       if err then
         callback(nil, err)
         return
@@ -78,7 +64,6 @@ local function send_message(client, msg, callback)
 
       if chunk then
         buf = buf .. chunk
-        -- Since we're expecting a newline-terminated message
         if buf:find("\n") then
           client:read_stop()
           callback(buf, nil)
@@ -103,7 +88,7 @@ local function run_commands(commands, cwd)
     end
   end
 
-  local function backup_run_command(commands, cwd)
+  local function backup_run_command()
     vim.schedule(function()
       local backend = require("backends.native")
       backend.run_commands(commands, cwd)
@@ -118,101 +103,63 @@ local function run_commands(commands, cwd)
         vim.notify("Could not connect to redr server", vim.log.levels.ERROR)
       end
       client:close()
-      backup_run_command(commands, cwd)
+      backup_run_command()
       return
     end
 
-    send_message(client, introduce_message(cwd, M.config.run_next_on_failure), function(introduce_res, introduce_err)
-      if introduce_err then
+    send_message(client, run_message(commands, cwd, M.config.run_next_on_failure), function(ok_res, ok_err)
+      if ok_err then
         if M.config.redr_show_could_not_connect then
-          vim.notify("Error sending introduce message: " .. introduce_err, vim.log.levels.ERROR)
+          vim.notify("Error sending run message: " .. ok_err, vim.log.levels.ERROR)
         end
         client:close()
-        backup_run_command(commands, cwd)
+        backup_run_command()
         return
       end
 
-      local introduce_parsed = parse_message(introduce_res)
-      if introduce_parsed == nil or introduce_parsed.type ~= "ok" then
-        if introduce_parsed ~= nil and introduce_parsed.type == "kick_off" then
-          return
-        end
-        vim.notify("Error parsing response from redr server: " .. vim.inspect(introduce_res), vim.log.levels.ERROR)
-        send_message(client, bye_message(), function()
-          client:close()
-        end)
+      local ok_parsed = parse_message(ok_res)
+      if ok_parsed == nil or ok_parsed.type ~= "ok" then
+        vim.notify("Error parsing response from redr server: " .. vim.inspect(ok_res), vim.log.levels.ERROR)
+        client:close()
         return
       end
 
-      send_message(client, run_commands_message(commands), function(run_commands_res, run_commands_err)
-        if run_commands_err then
-          vim.notify("Error sending run_commands message: " .. run_commands_err, vim.log.levels.ERROR)
-          client:close()
-          backup_run_command(commands, cwd)
-          return
-        end
-
-        local command_parsed = parse_message(run_commands_res)
-        if command_parsed == nil or command_parsed.type ~= "command_ran" then
-          vim.notify("Error parsing response from redr server: " .. vim.inspect(run_commands_res), vim.log.levels.ERROR)
-          send_message(client, bye_message(), function()
+      local function recursive_loop()
+        send_message(client, ignore_message(), function(ignore_res, ignore_err)
+          if ignore_err then
+            vim.notify("Error sending ignore message: " .. ignore_err, vim.log.levels.ERROR)
             client:close()
-          end)
-          return
-        end
+            return
+          end
 
-        if command_parsed.exit_code ~= 0 then
-          vim.notify(
-            "Command `" .. commands[1] .. "` failed with exit code " .. command_parsed.exit_code,
-            vim.log.levels.ERROR
-          )
-          send_message(client, bye_message(), function()
+          local parsed = parse_message(ignore_res)
+          if not parsed then
+            vim.notify("Invalid response from server: " .. vim.inspect(ignore_res), vim.log.levels.ERROR)
             client:close()
-          end)
-          return
-        end
+            return
+          end
 
-        vim.notify("Command `" .. commands[1] .. "` ran successfully", vim.log.levels.INFO)
-
-        local function process_command_result(i)
-          send_message(client, ok_message(), function(command_res, command_err)
-            if command_err then
-              vim.notify("Error acknowledging command result: " .. command_err, vim.log.levels.ERROR)
+          if parsed.type == "command_ran" then
+            if not parsed.silent then
+              vim.notify(
+                "Command `" .. parsed.cmd .. "` ran with exit code " .. parsed.exit_code,
+                parsed.exit_code == 0 and vim.log.levels.INFO or vim.log.levels.ERROR
+              )
+            else
+            end
+            if parsed.last then
               client:close()
-              return
+            else
+              recursive_loop()
             end
+          else
+            vim.notify("Unexpected message type: " .. vim.inspect(parsed), vim.log.levels.ERROR)
+            client:close()
+          end
+        end)
+      end
 
-            ---@diagnostic disable-next-line: redefined-local
-            local command_parsed = parse_message(command_res)
-            if command_parsed == nil then
-              vim.notify("Unexpected response from server: " .. vim.inspect(command_res), vim.log.levels.ERROR)
-              return
-            end
-
-            if command_parsed.type == "command_ran" then
-              local command = commands[i]
-              if command_parsed.exit_code ~= 0 then
-                vim.notify(
-                  "Command `" .. command .. "` failed with exit code " .. command_parsed.exit_code,
-                  vim.log.levels.ERROR
-                )
-                send_message(client, bye_message(), function()
-                  client:close()
-                end)
-                return
-              end
-              vim.notify("Command `" .. command .. "` ran successfully", vim.log.levels.INFO)
-              process_command_result(i + 1)
-            elseif command_parsed.type == "ok" then
-              send_message(client, bye_message(), function()
-                client:close()
-              end)
-            end
-          end)
-        end
-
-        process_command_result(2)
-      end)
+      recursive_loop()
     end)
   end)
 end
