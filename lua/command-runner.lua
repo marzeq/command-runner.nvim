@@ -9,10 +9,8 @@ local config = {
   start_insert = false,
   ---@type boolean @Whether the cursor should be positioned at the end of the buffer in the Set buffer (default: true)
   start_at_end = true,
-  ---@type "native"|"redr" @What backend to use ("native" or "redr") (default: "native")
+  ---@type ("native"|fun(commands: string[], cwd: string)) @The backend to use for running commands (default: "native")
   backend = "native",
-  ---@type boolean @Whether to display "could not connect to redr" messages (default: true)
-  redr_show_could_not_connect = true,
 }
 
 local function load_json(filepath)
@@ -158,9 +156,8 @@ M.run_arbitrary_commands = function(commands)
   if M.config.backend == "native" then
     local backend = require("backends.native")
     backend.run_commands(commands, get_dir_absolute())
-  elseif M.config.backend == "redr" then
-    local backend = require("backends.redr")
-    backend.run_commands(commands, get_dir_absolute())
+  elseif type(M.config.backend) == "function" then
+    M.config.backend(commands, get_dir_absolute())
   else
     vim.notify("Invalid backend", vim.log.levels.ERROR)
   end

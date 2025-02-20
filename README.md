@@ -26,22 +26,17 @@ using [lazy.nvim](https://github.com/folke/lazy.nvim):
     start_insert = false,
     -- Whether the cursor should be positioned at the end of the buffer in the Set buffer
     start_at_end = true,
-    -- What backend to use ("native" or "redr") (default: "native")
+    -- What backend to use ("native" | custom, function signature: function(commands: string[], cwd: string) -> void)
     backend = "native",
-    -- Whether to display "could not connect to redr" messages (default: true)
-    redr_show_could_not_connect = true,
   },
 },
 ```
 
 ## backends
 
-the native backend is the default one, where everything is done in neovim (this is the one displayed in the demo)
+the native backend is the only one present for now, where everything is done in neovim (this is the one displayed in the demo)
 
-[redr](https://github.com/marzeq/redr) is my own command runner that i wrote in go specifically for this project. it runs over tcp sockets to communicate with neovim, and has the advantage of being a separate window that you can tile however you want.
-it's still pretty wip, but it's already usable. if you want to use it, (for now) please build it yourself (instructions in repo). when you want to use it, run the `redr` binary and then set the backend to "redr" in the opts
-
-if you're worried about bloat, only the backend you're using is loaded
+shoot a pr if you want to add a new backend (tmux, etc.), look at the `native` backend in `lua/backends/native.lua` for reference
 
 ## demo
 
@@ -52,9 +47,9 @@ https://github.com/user-attachments/assets/ba7bfcb1-661b-4477-980d-4dbc12d1dfad
 you can get access to lua api by requiring `"command-runner"` in your lua code, for example: `require("command-runner").set_commands()`
 
 
-| lua function                                 | vim command                                            | shortcut in set buffer/window | description                                                           |
+| lua function                                 | vim command                                            | shortcut in set buffer        | description                                                           |
 |----------------------------------------------|--------------------------------------------------------|-------------------------------|-----------------------------------------------------------------------|
-| `set_commands()`                             | `:CommandRunnerSet`                                    |                               | opens the set buffer/window. press `<esc>` or `q` to close it         |
+| `set_commands()`                             | `:CommandRunnerSet`                                    |                               | opens the set buffer. press `<esc>` or `q` to close it                |
 | `run_command(index: number)`                 | `:CommandRunnerRun {index}`                            | corresponding number `[1..9]` | runs the command at the given index                                   |
 | `run_command_select_ui()`                    | `:CommandRunnerRun`                                    |                               | opens a popup window with the commands, and you can select one to run |
 | `run_all_commands()`                         | `:CommandRunnerRunAll`                                 | `<CR>`                        | runs all the commands in sequence                                     |
