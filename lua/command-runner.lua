@@ -214,7 +214,7 @@ M.run_command_select_ui = function()
   vim.ui.select(indexes, {
     prompt = "Select command to run: ",
     format_item = function(item)
-      return item .. ": " .. commands[tonumber(item)]
+      return commands[tonumber(item)]
     end,
   }, function(choice)
     if choice == nil then
